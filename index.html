@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Teacher's AI Hub — Multilingual</title>
+  <style>
+    :root{
+      --bg:#071229; --card:#0f1724; --accent:#60a5fa; --muted:#9fb3d6;
+    }
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+      background:linear-gradient(180deg,var(--bg),#031226);color:#e6eef8;
+      min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .app{width:100%;max-width:980px;background:rgba(255,255,255,0.02);
+      border-radius:12px;padding:18px;box-shadow:0 10px 40px rgba(2,6,23,0.6)}
+    header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);
+      display:flex;align-items:center;justify-content:center;font-weight:800;color:#012b4b}
+    h1{margin:0;font-size:18px}
+    .muted{color:var(--muted);font-size:13px}
+    select,textarea,input{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);
+      background:transparent;color:inherit}
+    button{padding:8px 12px;border-radius:8px;border:none;
+      background:linear-gradient(90deg,var(--accent),#7c3aed);color:#012b4b;cursor:pointer}
+    .layout{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+    .panel{background:var(--card);padding:12px;border-radius:10px;min-height:320px;overflow:auto}
+    .chat{display:flex;flex-direction:column;gap:10px}
+    .msg{max-width:85%;padding:10px;border-radius:10px}
+    .msg.user{align-self:flex-end;background:linear-gradient(90deg,#0ea5a3,#60a5fa);color:#031225}
+    .msg.ai{align-self:flex-start;background:rgba(255,255,255,0.05)}
+    .actions{display:flex;flex-direction:column;gap:8px}
+    .footer{display:flex;gap:8px;align-items:center;margin-top:8px;justify-content:space-between;flex-wrap:wrap}
+    @media(max-width:880px){.layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo">TA</div>
+        <div>
+          <h1>Teacher's AI Hub</h1>
+          <div class="muted">Multi-AI • Multilingual • Lesson & Quiz Generator</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div>
+          <label class="muted small">AI Provider</label><br>
+          <select id="provider">
+            <option value="openai">OpenAI (ChatGPT)</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="grok">xAI Grok</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div>
+          <label class="muted small">Language</label><br>
+          <select id="language">
+            <option value="English">English</option>
+            <option value="Tamil">தமிழ் (Tamil)</option>
+            <option value="Sinhala">සිංහල (Sinhala)</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="panel">
+        <div id="chat" class="chat" aria-live="polite"></div>
+
+        <div style="margin-top:12px">
+          <textarea id="prompt" placeholder="Type your question or request..."></textarea>
+          <div class="footer">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button id="askBtn">Ask AI</button>
+              <button id="lessonBtn">Lesson Plan</button>
+              <button id="quizBtn">Quiz</button>
+              <button id="simplifyBtn">Simplify</button>
+            </div>
+            <div class="muted small">Language + Provider chosen above</div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="panel actions">
+        <h3>Quick Prompts</h3>
+        <button onclick="setPrompt('Create a grade 10 science lesson about gravity.')">Lesson: Gravity</button>
+        <button onclick="setPrompt('Generate 5 MCQs with answers on world history for grade 9.')">Quiz: History</button>
+        <button onclick="setPrompt('Simplify the concept of photosynthesis for grade 7.')">Simplify: Photosynthesis</button>
+
+        <h3 style="margin-top:10px">Controls</h3>
+        <button onclick="clearChat()">Clear Chat</button>
+        <button onclick="downloadTranscript()">Download Transcript</button>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const promptEl = document.getElementById('prompt');
+    const providerEl = document.getElementById('provider');
+    const langEl = document.getElementById('language');
+
+    function appendMessage(role, text) {
+      const d=document.createElement('div');
+      d.className='msg ' + (role==='user'?'user':'ai');
+      d.innerHTML=text.replace(/\n/g,'<br>');
+      chatEl.appendChild(d); chatEl.scrollTop=chatEl.scrollHeight;
+    }
+
+    async function askProvider(prompt,kind='qa'){
+      appendMessage('user',prompt);
+      appendMessage('ai','…thinking…');
+      try{
+        const res=await fetch('/api/ask',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            provider:providerEl.value,
+            prompt,
+            kind,
+            language:langEl.value
+          })
+        });
+        const json=await res.json();
+        const last=chatEl.querySelector('.msg.ai:last-child');
+        last.innerHTML=json.reply.replace(/\n/g,'<br>');
+      }catch(err){
+        const last=chatEl.querySelector('.msg.ai:last-child');
+        last.innerHTML='<span style="color:#f88">Error: '+err.message+'</span>';
+      }
+    }
+
+    document.getElementById('askBtn').onclick=()=>{
+      const p=promptEl.value.trim(); if(!p) return;
+      askProvider(p,'qa');
+    };
+    document.getElementById('lessonBtn').onclick=()=>{
+      const p=promptEl.value.trim()||'Create a 30-minute lesson plan.';
+      askProvider('Lesson Plan:\n'+p,'lesson');
+    };
+    document.getElementById('quizBtn').onclick=()=>{
+      const p=promptEl.value.trim()||'Generate a quiz with answers.';
+      askProvider('Quiz:\n'+p,'quiz');
+    };
+    document.getElementById('simplifyBtn').onclick=()=>{
+      const p=promptEl.value.trim(); if(!p) return;
+      askProvider('Simplify:\n'+p,'simplify');
+    };
+
+    function setPrompt(txt){promptEl.value=txt;promptEl.focus();}
+    function clearChat(){chatEl.innerHTML='';}
+    function downloadTranscript(){
+      const t=[...chatEl.children].map(c=>(c.classList.contains('user')?'Teacher: ':'AI: ')+c.textContent).join('\n\n');
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/plain'}));
+      a.download='chat.txt';a.click();
+    }
+  </script>
+</body>
+</html>
